@@ -10,53 +10,154 @@ class MtnWebhookTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_post_request_stores_webhook_request(): void
+    public function test_subscription_event_stores_webhook_and_subscription(): void
     {
-        $response = $this->postJson('/api/mtn/wh', [
-            'event' => 'payment.completed',
-            'data' => ['reference' => 'TXN123', 'amount' => 5000],
-        ]);
+        $response = $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987654,
+            'MSISDN' => '249999900046',
+            'Status' => 'ACT-SB',
+            'Price' => 0.00,
+        ]));
 
         $response->assertOk();
-        $response->assertJson(['status' => 'ok']);
-
-        $this->assertDatabaseHas('webhook_requests', [
-            'method' => 'POST',
-            'url' => 'http://localhost/api/mtn/wh',
-        ]);
-    }
-
-    public function test_get_request_stores_webhook_request(): void
-    {
-        $response = $this->getJson('/api/mtn/wh?foo=bar');
-
-        $response->assertOk();
+        $response->assertSee('OK');
 
         $this->assertDatabaseHas('webhook_requests', [
             'method' => 'GET',
         ]);
+
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'channel_id' => 101,
+            'operator_id' => 63401,
+            'request_id' => 987654,
+            'msisdn' => '249999900046',
+            'status' => 'ACT-SB',
+            'price' => '0.00',
+        ]);
     }
 
-    public function test_stores_headers_and_ip(): void
+    public function test_first_billing_success_stores_price(): void
     {
-        $response = $this->withHeaders([
-            'X-Signature' => 'abc123',
-        ])->postJson('/api/mtn/wh', ['test' => true]);
+        $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987655,
+            'MSISDN' => '249999900046',
+            'Status' => 'FSC-BL',
+            'Price' => 5.99,
+        ]))->assertOk();
 
-        $response->assertOk();
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'request_id' => 987655,
+            'status' => 'FSC-BL',
+            'price' => '5.99',
+        ]);
+    }
+
+    public function test_renewal_billing_success_stores_price(): void
+    {
+        $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987656,
+            'MSISDN' => '249999900046',
+            'Status' => 'RSC-BL',
+            'Price' => 5.99,
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'request_id' => 987656,
+            'status' => 'RSC-BL',
+            'price' => '5.99',
+        ]);
+    }
+
+    public function test_first_billing_failed_stores_zero_price(): void
+    {
+        $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987657,
+            'MSISDN' => '249999900046',
+            'Status' => 'FFL-BL',
+            'Price' => 0.00,
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'request_id' => 987657,
+            'status' => 'FFL-BL',
+            'price' => '0.00',
+        ]);
+    }
+
+    public function test_unsubscription_event(): void
+    {
+        $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987658,
+            'MSISDN' => '249999900046',
+            'Status' => 'BLD-SB',
+            'Price' => 0.00,
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'request_id' => 987658,
+            'status' => 'BLD-SB',
+            'price' => '0.00',
+        ]);
+    }
+
+    public function test_recycled_event(): void
+    {
+        $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987659,
+            'MSISDN' => '249999900046',
+            'Status' => 'RCL-SB',
+            'Price' => 0.00,
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('mtn_subscriptions', [
+            'request_id' => 987659,
+            'status' => 'RCL-SB',
+            'price' => '0.00',
+        ]);
+    }
+
+    public function test_webhook_request_stores_raw_payload_and_headers(): void
+    {
+        $this->withHeaders(['X-Custom' => 'test'])->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 987654,
+            'MSISDN' => '249999900046',
+            'Status' => 'ACT-SB',
+            'Price' => 0.00,
+        ]))->assertOk();
 
         $webhookRequest = WebhookRequest::first();
 
-        $this->assertArrayHasKey('x-signature', $webhookRequest->headers);
+        $this->assertArrayHasKey('x-custom', $webhookRequest->headers);
         $this->assertNotNull($webhookRequest->ip_address);
+        $this->assertEquals('101', $webhookRequest->payload['ChannelID']);
     }
 
-    public function test_stores_empty_payload(): void
+    public function test_response_is_plain_text_ok(): void
     {
-        $response = $this->postJson('/api/mtn/wh');
+        $response = $this->getJson('/api/mtn/wh?'.http_build_query([
+            'ChannelID' => 101,
+            'OperatorID' => 63401,
+            'RequestID' => 999999,
+            'MSISDN' => '249999900046',
+            'Status' => 'ACT-SB',
+            'Price' => 0.00,
+        ]));
 
         $response->assertOk();
-
-        $this->assertEquals(1, WebhookRequest::count());
+        $this->assertEquals('OK', $response->getContent());
     }
 }
