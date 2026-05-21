@@ -50,6 +50,8 @@ jobs:
           script: |
             cd /var/www/laravel/releases/${{ github.sha }}
             cp /var/www/laravel/shared/.env .env
+            chown -R www-data:www-data /var/www/laravel/releases/${{ github.sha }}
+            chmod -R 775 storage bootstrap/cache
             php artisan key:generate --force || true
             php artisan storage:link || true
             php artisan config:cache
@@ -57,6 +59,7 @@ jobs:
             php artisan view:cache
             php artisan migrate --force
             ln -sfn /var/www/laravel/releases/${{ github.sha }} /var/www/laravel/current
+            chown -R www-data:www-data /var/www/laravel/current
             php artisan optimize:clear
             php artisan config:cache
             php artisan queue:restart || true
