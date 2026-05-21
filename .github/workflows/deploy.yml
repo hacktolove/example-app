@@ -48,18 +48,38 @@ jobs:
           username: root
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           script: |
-            cd /var/www/laravel/releases/${{ github.sha }}
-            cp /var/www/laravel/shared/.env .env
-            chown -R www-data:www-data /var/www/laravel/releases/${{ github.sha }}
-            chmod -R 775 storage bootstrap/cache
-            php artisan key:generate --force || true
-            php artisan storage:link || true
+            RELEASE=/var/www/laravel/releases/${{ github.sha }}
+            SHARED=/var/www/laravel/shared
+
+            cp $SHARED/.env $RELEASE/.env
+
+            # Link shared storage so logs/uploads persist across releases
+            mkdir -p $SHARED/storage/app/public \
+                     $SHARED/storage/framework/cache \
+                     $SHARED/storage/framework/sessions \
+                     $SHARED/storage/framework/views \
+                     $SHARED/storage/logs
+            rm -rf $RELEASE/storage
+            ln -s $SHARED/storage $RELEASE/storage
+
+            chown -R www-data:www-data $RELEASE $SHARED/storage
+            chmod -R 775 $SHARED/storage $RELEASE/bootstrap/cache
+
+            cd $RELEASE
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
             php artisan migrate --force
-            ln -sfn /var/www/laravel/releases/${{ github.sha }} /var/www/laravel/current
-            chown -R www-data:www-data /var/www/laravel/current
+
+            # Grant app DB user access to all tables (fixes permission denied on sessions etc.)
+            DB_USER=$(grep "^DB_USERNAME=" $RELEASE/.env | cut -d'=' -f2 | tr -d '"'"'"')
+            DB_NAME=$(grep "^DB_DATABASE=" $RELEASE/.env | cut -d'=' -f2 | tr -d '"'"'"')
+            sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;" 2>/dev/null || true
+            sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;" 2>/dev/null || true
+            sudo -u postgres psql -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;" 2>/dev/null || true
+
+            ln -sfn $RELEASE /var/www/laravel/current
+            php artisan storage:link || true
             php artisan optimize:clear
             php artisan config:cache
             php artisan queue:restart || true
