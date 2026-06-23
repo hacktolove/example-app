@@ -62,9 +62,6 @@ jobs:
             rm -rf $RELEASE/storage
             ln -s $SHARED/storage $RELEASE/storage
 
-            chown -R www-data:www-data $RELEASE $SHARED/storage
-            chmod -R 775 $SHARED/storage $RELEASE/bootstrap/cache
-
             cd $RELEASE
             php artisan config:cache
             php artisan route:cache
@@ -83,6 +80,10 @@ jobs:
             php artisan optimize:clear
             php artisan config:cache
             php artisan queue:restart || true
+
+            # Fix ownership after all artisan commands so www-data can write at runtime
+            chown -R www-data:www-data $RELEASE $SHARED/storage
+            chmod -R 775 $SHARED/storage $RELEASE/bootstrap/cache
 
       - name: Notify Deployment
         if: always()
