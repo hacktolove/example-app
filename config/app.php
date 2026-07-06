@@ -123,4 +123,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Key
+    |--------------------------------------------------------------------------
+    |
+    | Static key required in the X-API-Key header for the check-sub and
+    | subscribe endpoints. Rotate via `php artisan api-key:generate`.
+    |
+    */
+
+    'api_key' => env('APP_API_KEY'),
+
 ];

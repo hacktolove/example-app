@@ -84,6 +84,21 @@ return [
             ]) : [],
         ],
 
+        'profiles' => [
+            'driver' => env('DB_PROFILES_CONNECTION', 'pgsql'),
+            'url' => env('DB_PROFILES_URL'),
+            'host' => env('DB_PROFILES_HOST', '127.0.0.1'),
+            'port' => env('DB_PROFILES_PORT', '5432'),
+            'database' => env('DB_PROFILES_DATABASE', 'profiles'),
+            'username' => env('DB_PROFILES_USERNAME', 'root'),
+            'password' => env('DB_PROFILES_PASSWORD', ''),
+            'charset' => env('DB_PROFILES_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_PROFILES_SSLMODE', 'prefer'),
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

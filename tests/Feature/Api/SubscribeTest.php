@@ -1,0 +1,94 @@
+<?php
+
+namespace Tests\Feature\Api;
+
+use App\Models\Profile;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class SubscribeTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected $connectionsToTransact = ['sqlite', 'profiles'];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['app.api_key' => 'test-api-key']);
+    }
+
+    private function headers(): array
+    {
+        return ['X-API-Key' => 'test-api-key'];
+    }
+
+    public function test_new_number_is_inserted(): void
+    {
+        $response = $this->withHeaders($this->headers())
+            ->postJson('/api/subscribe', ['number' => '+249999900046']);
+
+        $response->assertOk();
+        $response->assertJson([
+            'msisdn' => '+249999900046',
+            'status' => 1,
+            'action' => 'insert',
+        ]);
+
+        $this->assertDatabaseHas('profiles', [
+            'msisdn' => '+249999900046',
+            'status' => 1,
+            'channel' => 'api',
+        ], 'profiles');
+    }
+
+    public function test_existing_number_is_updated(): void
+    {
+        Profile::create([
+            'msisdn' => '+249999900046',
+            'status' => 0,
+            'channel' => 'api',
+        ]);
+
+        $response = $this->withHeaders($this->headers())
+            ->postJson('/api/subscribe', ['number' => '+249999900046']);
+
+        $response->assertOk();
+        $response->assertJson([
+            'msisdn' => '+249999900046',
+            'status' => 1,
+            'action' => 'update',
+        ]);
+
+        $this->assertDatabaseHas('profiles', [
+            'msisdn' => '+249999900046',
+            'status' => 1,
+        ], 'profiles');
+
+        $this->assertEquals(1, Profile::on('profiles')->count());
+    }
+
+    public function test_missing_number_returns_400(): void
+    {
+        $response = $this->withHeaders($this->headers())
+            ->postJson('/api/subscribe', []);
+
+        $response->assertStatus(400);
+    }
+
+    public function test_missing_api_key_returns_401(): void
+    {
+        $response = $this->postJson('/api/subscribe', ['number' => '+249999900046']);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_wrong_api_key_returns_401(): void
+    {
+        $response = $this->withHeaders(['X-API-Key' => 'wrong-key'])
+            ->postJson('/api/subscribe', ['number' => '+249999900046']);
+
+        $response->assertStatus(401);
+    }
+}
