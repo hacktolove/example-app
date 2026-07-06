@@ -1,0 +1,182 @@
+openapi: 3.0.3
+info:
+  title: Profile API
+  description: >
+    Subscriber profile lookup and subscription endpoints, backed by the
+    telco-owned `profiles` table. Replaces the legacy check_sub.php /
+    subscribe.php scripts.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Relative to the app's base URL (see APP_URL)
+security:
+  - ApiKeyAuth: []
+paths:
+  /check-sub:
+    get:
+      operationId: checkSub
+      summary: Check subscription status for an MSISDN
+      parameters:
+        - name: number
+          in: query
+          required: true
+          description: >
+            Phone number in any format. Digits and an optional leading `+`
+            are kept; if no `+` prefix is present, `+249` (Sudan) is
+            prepended after stripping leading zeros.
+          schema:
+            type: string
+          example: "+249999900046"
+      responses:
+        '200':
+          description: Current subscription status for the number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckSubResponse'
+              examples:
+                subscribed:
+                  value:
+                    msisdn: "+249999900046"
+                    status: 1
+                    subscribed: true
+                notSubscribed:
+                  value:
+                    msisdn: "+249999900046"
+                    status: 0
+                    subscribed: false
+        '400':
+          description: Missing or invalid `number` parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing:
+                  value:
+                    error: Missing number parameter
+                invalid:
+                  value:
+                    error: Invalid number format
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /subscribe:
+    post:
+      operationId: subscribe
+      summary: Subscribe an MSISDN (creates or reactivates its profile)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeRequest'
+            example:
+              number: "+249999900046"
+      responses:
+        '200':
+          description: Profile created or updated, status set to subscribed (1)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscribeResponse'
+              examples:
+                insert:
+                  value:
+                    msisdn: "+249999900046"
+                    status: 1
+                    action: insert
+                    message: Subscription inserted successfully
+                update:
+                  value:
+                    msisdn: "+249999900046"
+                    status: 1
+                    action: update
+                    message: Subscription updateed successfully
+        '400':
+          description: Missing or invalid `number` in the request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing:
+                  value:
+                    error: Missing number in JSON body
+                invalid:
+                  value:
+                    error: Invalid number format
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Static key, rotated via `php artisan api-key:generate`.
+  schemas:
+    CheckSubResponse:
+      type: object
+      properties:
+        msisdn:
+          type: string
+          example: "+249999900046"
+        status:
+          type: integer
+          example: 1
+        subscribed:
+          type: boolean
+          example: true
+      required: [msisdn, status, subscribed]
+    SubscribeRequest:
+      type: object
+      properties:
+        number:
+          type: string
+          description: Phone number in any format (normalized server-side).
+          example: "+249999900046"
+      required: [number]
+    SubscribeResponse:
+      type: object
+      properties:
+        msisdn:
+          type: string
+          example: "+249999900046"
+        status:
+          type: integer
+          enum: [1]
+          example: 1
+        action:
+          type: string
+          enum: [insert, update]
+        message:
+          type: string
+          example: Subscription inserted successfully
+      required: [msisdn, status, action, message]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+  responses:
+    Unauthorized:
+      description: Missing or incorrect X-API-Key header
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Unauthorized
+    ServerError:
+      description: Unexpected database error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Database error
