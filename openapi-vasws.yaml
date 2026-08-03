@@ -1,0 +1,384 @@
+openapi: 3.0.3
+info:
+  title: VAS Web Service
+  description: >
+    VAS Web Service used by Selfcare and CCS to manage subscriber VAS
+    registrations. All endpoints are `GET`, URL-based
+    (`/vasws/{function}?param=value`), return UTF-8 JSON, and are protected by
+    HTTP Basic Authentication. A subscriber has at most one active service at a
+    time; every subscribe/unsubscribe cycle is retained and returned by the
+    history endpoint.
+  version: 1.5.0
+servers:
+  - url: "{baseUrl}"
+    description: Base URL of the VAS Web Service (provided by the operator).
+    variables:
+      baseUrl:
+        default: https://example.com
+        description: Scheme and host where the service is hosted.
+security:
+  - BasicAuth: []
+paths:
+  /vasws/displayall:
+    get:
+      operationId: displayAll
+      summary: List all available services
+      description: Returns the full VAS service catalog. Takes no parameters.
+      responses:
+        '200':
+          description: The service catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  msg:
+                    type: string
+                    example: successful operation
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                required: [success, msg, data]
+              example:
+                success: true
+                msg: successful operation
+                data:
+                  - id: 1
+                    englishname: News
+                    arabicname: الأخبار
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /vasws/displayservices:
+    get:
+      operationId: displayServices
+      summary: List a subscriber's active services
+      parameters:
+        - $ref: '#/components/parameters/Mdn'
+      responses:
+        '200':
+          description: The subscriber's currently active services (empty array if none)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  msg:
+                    type: string
+                    example: successful operation
+                  result:
+                    $ref: '#/components/schemas/ResultCode'
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActiveService'
+                required: [success, msg, result, data]
+              example:
+                success: true
+                msg: successful operation
+                result: 0
+                data:
+                  - id: 1
+                    englishname: Sport
+                    arabicname: الرياضة
+                    subscription_date: "2023-12-01 15:55:00"
+                    subscription_channel: vasws
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /vasws/subscribe:
+    get:
+      operationId: subscribe
+      summary: Subscribe an MDN to one service
+      parameters:
+        - $ref: '#/components/parameters/Mdn'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: >
+            Subscription outcome. `result` 0 = subscribed, 1 = already
+            subscribed to this service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationResult'
+              examples:
+                subscribed:
+                  value:
+                    result: 0
+                    msg: subscribed successfully
+                    success: true
+                alreadySubscribed:
+                  value:
+                    result: 1
+                    msg: already subscribed
+                    success: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /vasws/remove:
+    get:
+      operationId: remove
+      summary: Unsubscribe an MDN from one service
+      description: >
+        Deactivates the subscription and writes a row to the unsubscription
+        history carrying forward the original subscription date/channel.
+      parameters:
+        - $ref: '#/components/parameters/Mdn'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: >
+            Removal outcome. `result` 0 = unsubscribed, 2 = not registered in
+            this service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationResult'
+              examples:
+                unsubscribed:
+                  value:
+                    result: 0
+                    msg: unsubscribed successfully
+                    success: true
+                notRegistered:
+                  value:
+                    result: 2
+                    msg: subscriber is not registered in this service
+                    success: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /vasws/removeall:
+    get:
+      operationId: removeAll
+      summary: Remove all of a subscriber's active services
+      description: >
+        Deactivates the subscriber's active service (if any) and logs it to
+        history the same way as `remove`. Succeeds even when nothing is active.
+      parameters:
+        - $ref: '#/components/parameters/Mdn'
+      responses:
+        '200':
+          description: Removal outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationResult'
+              example:
+                result: 0
+                msg: services have been removed successfully
+                success: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/SystemError'
+  /vasws/history:
+    get:
+      operationId: history
+      summary: List a subscriber's terminated (unsubscribed) service records
+      description: >
+        Returns only terminated cycles — never active subscriptions. Every
+        subscribe/unsubscribe cycle for the same service appears as its own
+        entry.
+      parameters:
+        - $ref: '#/components/parameters/Mdn'
+      responses:
+        '200':
+          description: The subscriber's unsubscription history (empty array if none)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  msg:
+                    type: string
+                    example: successful operation
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoryEntry'
+                required: [success, msg, data]
+              example:
+                success: true
+                msg: successful operation
+                data:
+                  - serviceid: 1
+                    englishname: Sport
+                    arabicname: الرياضة
+                    subscription_date: "2023-12-01 15:55:00"
+                    subscription_channel: sms
+                    unsubscription_date: "2023-12-05 12:40:00"
+                    unsubscription_channel: ccs
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/SystemError'
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      description: >
+        HTTP Basic credentials (username and password) issued to Selfcare/CCS
+        by the VAS Web Service operator.
+  parameters:
+    Mdn:
+      name: mdn
+      in: query
+      required: true
+      description: >
+        Subscriber MSISDN. Normalized server-side — digits and an optional
+        leading `+` are kept; without a `+`, `+249` (Sudan) is prepended after
+        stripping leading zeros.
+      schema:
+        type: string
+      example: "0999900046"
+    ServiceId:
+      name: serviceid
+      in: query
+      required: true
+      description: Catalog id of the service (see `/vasws/displayall`).
+      schema:
+        type: integer
+      example: 1
+  schemas:
+    ResultCode:
+      type: integer
+      description: >
+        Shared result code — 0: success, 1: already registered in this service,
+        2: not registered in this service, 10: system error.
+      enum: [0, 1, 2, 10]
+      example: 0
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        englishname:
+          type: string
+          example: News
+        arabicname:
+          type: string
+          example: الأخبار
+      required: [id, englishname, arabicname]
+    ActiveService:
+      allOf:
+        - $ref: '#/components/schemas/Service'
+        - type: object
+          properties:
+            subscription_date:
+              type: string
+              example: "2023-12-01 15:55:00"
+            subscription_channel:
+              type: string
+              example: vasws
+          required: [subscription_date, subscription_channel]
+    HistoryEntry:
+      type: object
+      properties:
+        serviceid:
+          type: integer
+          example: 1
+        englishname:
+          type: string
+          example: Sport
+        arabicname:
+          type: string
+          example: الرياضة
+        subscription_date:
+          type: string
+          example: "2023-12-01 15:55:00"
+        subscription_channel:
+          type: string
+          example: sms
+        unsubscription_date:
+          type: string
+          example: "2023-12-05 12:40:00"
+        unsubscription_channel:
+          type: string
+          example: ccs
+      required:
+        - serviceid
+        - englishname
+        - arabicname
+        - subscription_date
+        - subscription_channel
+        - unsubscription_date
+        - unsubscription_channel
+    MutationResult:
+      type: object
+      properties:
+        result:
+          $ref: '#/components/schemas/ResultCode'
+        msg:
+          type: string
+        success:
+          type: boolean
+      required: [result, msg, success]
+  responses:
+    BadRequest:
+      description: A required parameter is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MutationResult'
+          example:
+            result: 10
+            msg: mdn is required
+            success: false
+    Unauthorized:
+      description: Missing or incorrect HTTP Basic credentials
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              msg:
+                type: string
+                example: unauthorized
+            required: [success, msg]
+          example:
+            success: false
+            msg: unauthorized
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Basic realm="vasws"
+    SystemError:
+      description: Unexpected database or system error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MutationResult'
+          example:
+            result: 10
+            msg: system error
+            success: false

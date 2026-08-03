@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 #[Fillable(['msisdn', 'package', 'language', 'channel', 'status', 'subs_date', 'subs_time', 'last_update_date', 'last_update_time', 'last_charge_date', 'last_charge_time'])]
 class Profile extends Model
@@ -28,6 +29,17 @@ class Profile extends Model
             'last_update_date' => 'date',
             'last_charge_date' => 'date',
         ];
+    }
+
+    public function subscribedAt(): ?Carbon
+    {
+        if (! $this->subs_date) {
+            return null;
+        }
+
+        return Carbon::parse(
+            $this->subs_date->format('Y-m-d').' '.($this->subs_time ?: '00:00:00')
+        );
     }
 
     public static function normalizeMsisdn(string $number): ?string
