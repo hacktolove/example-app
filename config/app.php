@@ -135,4 +135,19 @@ return [
 
     'api_key' => env('APP_API_KEY'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | VAS Web Service Basic Auth
+    |--------------------------------------------------------------------------
+    |
+    | HTTP Basic Auth credentials required by all /vasws/* endpoints, used
+    | by Selfcare and CCS to manage VAS subscriptions.
+    |
+    */
+
+    'vas_ws' => [
+        'username' => env('VAS_WS_USERNAME'),
+        'password' => env('VAS_WS_PASSWORD'),
+    ],
+
 ];
