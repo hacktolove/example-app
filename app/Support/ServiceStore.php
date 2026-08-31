@@ -6,6 +6,7 @@ use App\Models\Profile;
 use App\Models\VasSubscriptionHistory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 /**
  * A single VAS service, together with the database that holds its subscribers.
@@ -36,6 +37,8 @@ final class ServiceStore
         $stores = [];
 
         foreach (config('vasws.services', []) as $id => $service) {
+            self::assertComplete($id, $service);
+
             $stores[(int) $id] = new self(
                 id: (int) $id,
                 package: $service['package'],
@@ -46,6 +49,34 @@ final class ServiceStore
         }
 
         return $stores;
+    }
+
+    /**
+     * Fail with something actionable when a catalog entry is incomplete.
+     *
+     * This runs during `migrate`, so an unhelpful error here lands in the
+     * middle of a deploy. A stale config cache is by far the most common
+     * cause: the deployed config/vasws.php is correct but never read.
+     *
+     * @param  array<string, mixed>  $service
+     */
+    private static function assertComplete(int|string $id, array $service): void
+    {
+        $missing = array_values(array_diff(
+            ['package', 'connection', 'english_name', 'arabic_name'],
+            array_keys($service)
+        ));
+
+        if ($missing === []) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'VAS service [%s] in config/vasws.php is missing: %s. '
+            .'If that file looks correct, the config cache is stale — run `php artisan config:clear`.',
+            $id,
+            implode(', ', $missing)
+        ));
     }
 
     /**

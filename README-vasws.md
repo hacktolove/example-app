@@ -108,5 +108,8 @@ service's `profiles.package` column, and `connection` must name a connection def
 2. Add a `'<connection>' => [...]` block to `config/database.php` and the matching
    `DB_<NAME>_*` variables to `.env`.
 3. Run `php artisan migrate` to create the two tables on the new database.
+4. On any environment that caches config, run `php artisan config:clear` (or
+   `optimize:clear`) **before** migrating. The catalog is read from config, so a cache
+   built before the change makes `migrate` fail on the old entries.
 
 No application code changes; every endpoint is catalog-driven.
