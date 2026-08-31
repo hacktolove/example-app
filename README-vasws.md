@@ -95,6 +95,29 @@ keyed by `msisdn`, to keep lookups under Selfcare's 5-second client timeout.
 Application code never names a connection directly — `App\Support\ServiceStore` resolves
 a `serviceid` to its store, and is the only place that knows connections exist.
 
+## Upgrading from the single `profiles` connection
+
+Before services owned separate databases there was one `profiles` connection configured
+with `DB_PROFILES_*`. Those variables are **no longer read**. An environment still using
+them connects with config defaults instead — localhost, user `root`, no password — and
+`migrate` fails with `fe_sendauth: no password supplied`.
+
+On each deployed environment, in the same release as the code:
+
+1. Copy the old `DB_PROFILES_*` values to `DB_NEWS_*`. `news` is the existing `service_1`
+   database, so the credentials are unchanged.
+2. Add `DB_SPORT_*` for `service_2`. **That database must already exist** — migrations
+   create tables, never databases.
+3. `php artisan config:clear`, so the new values are actually read.
+4. Verify both connections before migrating:
+
+   ```bash
+   php artisan db:show --database=news
+   php artisan db:show --database=sport
+   ```
+
+5. `php artisan migrate`, then rebuild caches with `php artisan optimize`.
+
 ## Service catalog
 
 The list of services — id, package code, connection, English + Arabic names — is defined
