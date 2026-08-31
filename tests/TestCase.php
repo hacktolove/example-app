@@ -20,6 +20,16 @@ abstract class TestCase extends BaseTestCase
      */
     protected $connectionsToTransact = ['sqlite', 'news', 'sport'];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Inertia pages render through the root Blade view, which references the
+        // Vite manifest. Tests assert on props and responses, never on built
+        // assets, so there is no reason to require a production build first.
+        $this->withoutVite();
+    }
+
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void
     {
         if (! Features::enabled($feature)) {
