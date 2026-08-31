@@ -97,6 +97,28 @@ class DiskTest extends TestCase
         $this->assertDirectoryExists($this->root.'/news');
     }
 
+    /**
+     * The telephony system reads these files as a different user. Flysystem's
+     * default 0700 directory would deny it traversal, and that failure shows up
+     * as a silent prompt during a call rather than as an error at upload.
+     */
+    public function test_uploaded_prompts_are_readable_by_another_user(): void
+    {
+        $this->post('/ivr', [
+            'service_id' => 1,
+            'file' => UploadedFile::fake()->createWithContent('welcome.wav', $this->wav()),
+        ])->assertSessionHasNoErrors();
+
+        $dir = $this->root.'/news';
+        $file = $dir.'/001-welcome.wav';
+
+        $dirPerms = fileperms($dir) & 0777;
+        $filePerms = fileperms($file) & 0777;
+
+        $this->assertSame(0005, $dirPerms & 0005, 'Others must be able to enter and list the service directory.');
+        $this->assertSame(0004, $filePerms & 0004, 'Others must be able to read the prompt.');
+    }
+
     public function test_reordering_renames_files_on_the_real_filesystem(): void
     {
         foreach (['welcome.wav', 'menu.wav'] as $name) {
