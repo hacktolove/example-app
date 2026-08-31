@@ -4,8 +4,12 @@ Telco subscription app. Handles MTN/Xceed subscription lifecycle webhooks and ex
 
 ## Language
 
+**Service**:
+A VAS product a subscriber can subscribe to independently — currently News and Sport — identified to Selfcare/CCS by its `serviceid`. Services are fully independent of one another: a subscriber may hold any combination of them at once, and subscribing to or leaving one never affects another. Each Service owns its own subscribers and its own unsubscription history; nothing is shared between Services.
+_Avoid_: Package (that is a Service's short code, not the Service), product, offering
+
 **Profile**:
-A subscriber's current state, keyed by MSISDN — package, language, channel, and subscription status. Lives on an external telco-owned Postgres database (`profiles` table), separate from this app's own database.
+A subscriber's current state *within one Service*, keyed by MSISDN — subscription status, channel, and lifecycle dates. There is at most one Profile per MSISDN per Service, and the same MSISDN may have independent Profiles in several Services at once. Profiles live on external telco-owned Postgres databases, separate from this app's own database.
 _Avoid_: Subscriber, account, user
 
 **MtnSubscription**:

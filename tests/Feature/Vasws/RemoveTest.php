@@ -11,8 +11,6 @@ class RemoveTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $connectionsToTransact = ['sqlite', 'profiles'];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -27,7 +25,7 @@ class RemoveTest extends TestCase
 
     public function test_removes_active_subscription_and_logs_history(): void
     {
-        Profile::create([
+        Profile::on('sport')->create([
             'msisdn' => '+249999900046',
             'package' => 'sport',
             'status' => 1,
@@ -41,13 +39,28 @@ class RemoveTest extends TestCase
         $response->assertOk();
         $response->assertJson(['result' => 0, 'msg' => 'unsubscribed successfully', 'success' => true]);
 
-        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'profiles');
+        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'sport');
         $this->assertDatabaseHas('vas_subscription_history', [
             'mdn' => '+249999900046',
             'package' => 'sport',
             'subscribed_channel' => 'vasws',
             'unsubscribed_channel' => 'vasws',
-        ], 'profiles');
+        ], 'sport');
+    }
+
+    public function test_history_is_written_to_the_removed_services_own_database(): void
+    {
+        Profile::on('sport')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'sport',
+            'status' => 1,
+            'channel' => 'vasws',
+        ]);
+
+        $this->authed('/vasws/remove?mdn=0999900046&serviceid=2')->assertOk();
+
+        $this->assertDatabaseCount('vas_subscription_history', 1, 'sport');
+        $this->assertDatabaseCount('vas_subscription_history', 0, 'news');
     }
 
     public function test_not_registered_returns_result_2(): void
@@ -60,7 +73,7 @@ class RemoveTest extends TestCase
 
     public function test_registered_to_different_service_returns_result_2(): void
     {
-        Profile::create([
+        Profile::on('news')->create([
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
@@ -71,6 +84,8 @@ class RemoveTest extends TestCase
 
         $response->assertOk();
         $response->assertJson(['result' => 2, 'success' => false]);
+
+        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 1], 'news');
     }
 
     public function test_missing_auth_returns_401(): void

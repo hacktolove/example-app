@@ -11,8 +11,6 @@ class SubscribeTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $connectionsToTransact = ['sqlite', 'profiles'];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -37,12 +35,12 @@ class SubscribeTest extends TestCase
             'package' => 'news',
             'status' => 1,
             'channel' => 'vasws',
-        ], 'profiles');
+        ], 'news');
     }
 
     public function test_already_subscribed_to_same_service_returns_result_1(): void
     {
-        Profile::create([
+        Profile::on('news')->create([
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
@@ -55,9 +53,9 @@ class SubscribeTest extends TestCase
         $response->assertJson(['result' => 1, 'msg' => 'already subscribed', 'success' => false]);
     }
 
-    public function test_switching_service_logs_previous_subscription_to_history(): void
+    public function test_subscribing_to_a_second_service_leaves_the_first_untouched(): void
     {
-        Profile::create([
+        Profile::on('news')->create([
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
@@ -71,12 +69,50 @@ class SubscribeTest extends TestCase
         $response->assertOk();
         $response->assertJson(['result' => 0, 'success' => true]);
 
-        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'package' => 'sport', 'status' => 1], 'profiles');
-        $this->assertDatabaseHas('vas_subscription_history', [
-            'mdn' => '+249999900046',
+        $this->assertDatabaseHas('profiles', [
+            'msisdn' => '+249999900046',
+            'package' => 'sport',
+            'status' => 1,
+        ], 'sport');
+
+        $news = Profile::on('news')->find('+249999900046');
+        $this->assertSame('news', $news->package);
+        $this->assertSame(1, $news->status);
+        $this->assertSame('2023-12-01', $news->subs_date->toDateString());
+    }
+
+    public function test_subscribing_to_a_second_service_writes_no_history(): void
+    {
+        Profile::on('news')->create([
+            'msisdn' => '+249999900046',
             'package' => 'news',
-            'unsubscribed_channel' => 'vasws',
-        ], 'profiles');
+            'status' => 1,
+            'channel' => 'vasws',
+        ]);
+
+        $this->authed('/vasws/subscribe?mdn=0999900046&serviceid=2')->assertOk();
+
+        $this->assertDatabaseCount('vas_subscription_history', 0, 'news');
+        $this->assertDatabaseCount('vas_subscription_history', 0, 'sport');
+    }
+
+    public function test_resubscribing_after_removal_starts_a_new_subscription_period(): void
+    {
+        Profile::on('news')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'news',
+            'status' => 0,
+            'channel' => 'ccs',
+            'subs_date' => '2023-12-01',
+            'subs_time' => '15:55:00',
+        ]);
+
+        $this->authed('/vasws/subscribe?mdn=0999900046&serviceid=1')->assertOk();
+
+        $news = Profile::on('news')->find('+249999900046');
+        $this->assertSame(1, $news->status);
+        $this->assertSame('vasws', $news->channel);
+        $this->assertSame(now()->toDateString(), $news->subs_date->toDateString());
     }
 
     public function test_missing_serviceid_returns_400(): void

@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Vasws;
 
 use App\Http\Controllers\Controller;
 use App\Models\Profile;
-use App\Models\VasSubscriptionHistory;
-use App\Support\VasServiceCatalog;
+use App\Support\ServiceStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +14,9 @@ class SubscribeController extends Controller
 {
     /**
      * Handle the incoming request.
+     *
+     * Services are independent, so subscribing here never affects a
+     * subscriber's registration in any other service.
      */
     public function __invoke(Request $request): JsonResponse
     {
@@ -30,7 +32,7 @@ class SubscribeController extends Controller
         }
 
         $msisdn = Profile::normalizeMsisdn($mdn);
-        $service = VasServiceCatalog::find((int) $serviceId);
+        $service = ServiceStore::find((int) $serviceId);
 
         if (! $msisdn || ! $service) {
             return response()->json([
@@ -41,38 +43,11 @@ class SubscribeController extends Controller
         }
 
         try {
-            $profile = Profile::find($msisdn);
-            $alreadyOnThisService = $profile && (int) $profile->status === 1 && $profile->package === $service['package'];
-
-            if ($alreadyOnThisService) {
+            if ($service->isSubscribed($msisdn)) {
                 return response()->json(['result' => 1, 'msg' => 'already subscribed', 'success' => false]);
             }
 
-            $switchingFromAnotherService = $profile && (int) $profile->status === 1;
-
-            if ($switchingFromAnotherService) {
-                VasSubscriptionHistory::create([
-                    'mdn' => $msisdn,
-                    'package' => $profile->package,
-                    'subscribed_at' => $profile->subscribedAt() ?? now(),
-                    'subscribed_channel' => $profile->channel,
-                    'unsubscribed_at' => now(),
-                    'unsubscribed_channel' => 'vasws',
-                ]);
-            }
-
-            Profile::updateOrCreate(
-                ['msisdn' => $msisdn],
-                [
-                    'package' => $service['package'],
-                    'status' => 1,
-                    'channel' => 'vasws',
-                    'subs_date' => now()->toDateString(),
-                    'subs_time' => now()->toTimeString(),
-                    'last_update_date' => now()->toDateString(),
-                    'last_update_time' => now()->toTimeString(),
-                ]
-            );
+            $service->subscribe($msisdn, 'vasws');
         } catch (Throwable $e) {
             Log::error('vasws subscribe failed', ['mdn' => $msisdn, 'serviceid' => $serviceId, 'exception' => $e]);
 

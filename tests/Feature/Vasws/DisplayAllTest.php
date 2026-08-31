@@ -9,8 +9,6 @@ class DisplayAllTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $connectionsToTransact = ['sqlite', 'profiles'];
-
     protected function setUp(): void
     {
         parent::setUp();

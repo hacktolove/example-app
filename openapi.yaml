@@ -2,10 +2,11 @@ openapi: 3.0.3
 info:
   title: Profile API
   description: >
-    Subscriber profile lookup and subscription endpoints, backed by the
-    telco-owned `profiles` table. Replaces the legacy check_sub.php /
-    subscribe.php scripts.
-  version: 1.0.0
+    Subscriber profile lookup and subscription endpoints. Every VAS service
+    owns its own telco-owned database, so each request names the service it
+    applies to via `serviceid`; services are independent and a subscriber may
+    be registered in any combination of them.
+  version: 2.0.0
 servers:
   - url: /api
     description: Relative to the app's base URL (see APP_URL)
@@ -27,9 +28,19 @@ paths:
           schema:
             type: string
           example: "+249999900046"
+        - name: serviceid
+          in: query
+          required: true
+          description: >
+            The service to check, as listed by `GET /vasws/displayall`.
+            Each service has its own database; a subscription in one service
+            says nothing about any other.
+          schema:
+            type: integer
+          example: 1
       responses:
         '200':
-          description: Current subscription status for the number
+          description: Current subscription status for the number in this service
           content:
             application/json:
               schema:
@@ -38,26 +49,34 @@ paths:
                 subscribed:
                   value:
                     msisdn: "+249999900046"
+                    serviceid: 1
                     status: 1
                     subscribed: true
                 notSubscribed:
                   value:
                     msisdn: "+249999900046"
+                    serviceid: 1
                     status: 0
                     subscribed: false
         '400':
-          description: Missing or invalid `number` parameter
+          description: Missing or invalid `number` or `serviceid` parameter
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                missing:
+                missingNumber:
                   value:
                     error: Missing number parameter
-                invalid:
+                missingServiceId:
+                  value:
+                    error: Missing serviceid parameter
+                invalidNumber:
                   value:
                     error: Invalid number format
+                invalidServiceId:
+                  value:
+                    error: Invalid serviceid
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -74,9 +93,10 @@ paths:
               $ref: '#/components/schemas/SubscribeRequest'
             example:
               number: "+249999900046"
+              serviceid: 1
       responses:
         '200':
-          description: Profile created or updated, status set to subscribed (1)
+          description: Profile created or updated in that service, status set to subscribed (1)
           content:
             application/json:
               schema:
@@ -85,28 +105,36 @@ paths:
                 insert:
                   value:
                     msisdn: "+249999900046"
+                    serviceid: 1
                     status: 1
                     action: insert
                     message: Subscription inserted successfully
                 update:
                   value:
                     msisdn: "+249999900046"
+                    serviceid: 1
                     status: 1
                     action: update
                     message: Subscription updateed successfully
         '400':
-          description: Missing or invalid `number` in the request body
+          description: Missing or invalid `number` or `serviceid` in the request body
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                missing:
+                missingNumber:
                   value:
                     error: Missing number in JSON body
-                invalid:
+                missingServiceId:
+                  value:
+                    error: Missing serviceid in JSON body
+                invalidNumber:
                   value:
                     error: Invalid number format
+                invalidServiceId:
+                  value:
+                    error: Invalid serviceid
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -125,13 +153,17 @@ components:
         msisdn:
           type: string
           example: "+249999900046"
+        serviceid:
+          type: integer
+          description: The service this status applies to.
+          example: 1
         status:
           type: integer
           example: 1
         subscribed:
           type: boolean
           example: true
-      required: [msisdn, status, subscribed]
+      required: [msisdn, serviceid, status, subscribed]
     SubscribeRequest:
       type: object
       properties:
@@ -139,13 +171,21 @@ components:
           type: string
           description: Phone number in any format (normalized server-side).
           example: "+249999900046"
-      required: [number]
+        serviceid:
+          type: integer
+          description: >
+            The service to subscribe to, as listed by `GET /vasws/displayall`.
+          example: 1
+      required: [number, serviceid]
     SubscribeResponse:
       type: object
       properties:
         msisdn:
           type: string
           example: "+249999900046"
+        serviceid:
+          type: integer
+          example: 1
         status:
           type: integer
           enum: [1]
@@ -156,7 +196,7 @@ components:
         message:
           type: string
           example: Subscription inserted successfully
-      required: [msisdn, status, action, message]
+      required: [msisdn, serviceid, status, action, message]
     ErrorResponse:
       type: object
       properties:

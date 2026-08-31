@@ -47,42 +47,66 @@ Example call:
 curl -u selfcare:secret "https://your-app.example/vasws/displayall"
 ```
 
-## Pointing at the database
+## Pointing at the databases
 
-Subscriber state lives on the telco-owned Postgres database, reached through the existing
-**`profiles`** Eloquent connection (shared with the check-sub/subscribe API). This service does
-not create a parallel subscribers/services schema:
+Every service owns its own telco-owned Postgres database, reached through its own
+Eloquent connection. Services are independent: a subscriber may be registered in any
+combination of them at once, and subscribing to or leaving one never touches another.
 
-- **Current subscription state** — the `profiles` table. One active service per MSISDN, held in
-  the `package` column, with `status = 1` meaning subscribed. Subscribing to a different service
-  overwrites `package` (and logs the previous one to history).
-- **Unsubscription history** — a `vas_subscription_history` table on the same `profiles`
-  connection, written on every removal (see the migration
-  `database/migrations/*_create_vas_subscription_history_table.php`). Each subscribe/unsubscribe
-  cycle is a separate row, so `history` can return every past occurrence.
+Each service database carries the same two tables:
 
-Configure the connection via `DB_PROFILES_*` in `.env`:
+- **Current subscription state** — the `profiles` table, with `status = 1` meaning
+  subscribed. `package` holds the service's short code, and is kept for the telco's own
+  tooling even though the database already implies the service.
+- **Unsubscription history** — a `vas_subscription_history` table, written on every
+  removal. Each subscribe/unsubscribe cycle is a separate row, so `history` can return
+  every past occurrence. `history` reads from all service databases and merges them into
+  one chronological list.
+
+`serviceid` maps to a connection in [`config/vasws.php`](config/vasws.php); the
+connections themselves are defined in `config/database.php`. Configure them in `.env`:
 
 ```env
-DB_PROFILES_CONNECTION=pgsql
-DB_PROFILES_HOST=127.0.0.1
-DB_PROFILES_PORT=5432
-DB_PROFILES_DATABASE=service_1     # the existing 50501/50502 subscription DB
-DB_PROFILES_USERNAME=...
-DB_PROFILES_PASSWORD=...
+DB_NEWS_CONNECTION=pgsql
+DB_NEWS_HOST=127.0.0.1
+DB_NEWS_PORT=5432
+DB_NEWS_DATABASE=service_1     # the existing 50501/50502 subscription DB
+DB_NEWS_USERNAME=...
+DB_NEWS_PASSWORD=...
+
+DB_SPORT_CONNECTION=pgsql
+DB_SPORT_HOST=127.0.0.1
+DB_SPORT_PORT=5432
+DB_SPORT_DATABASE=service_2
+DB_SPORT_USERNAME=...
+DB_SPORT_PASSWORD=...
 ```
 
-Then create the history table on that database:
+Then create the tables on any database that doesn't already have them:
 
 ```bash
 php artisan migrate
 ```
 
-`mdn` and `package` are indexed on `vas_subscription_history`, and `profiles` is keyed by
-`msisdn`, to keep lookups under Selfcare's 5-second client timeout.
+Migrations skip a table that already exists, so pointing at a telco-provisioned database
+is safe. `mdn` and `package` are indexed on `vas_subscription_history`, and `profiles` is
+keyed by `msisdn`, to keep lookups under Selfcare's 5-second client timeout.
+
+Application code never names a connection directly — `App\Support\ServiceStore` resolves
+a `serviceid` to its store, and is the only place that knows connections exist.
 
 ## Service catalog
 
-The list of services (id → package code, English + Arabic names) is defined in
-[`config/vasws.php`](config/vasws.php). Add or edit entries there; `package` must match the value
-stored in `profiles.package` for that service.
+The list of services — id, package code, connection, English + Arabic names — is defined
+in [`config/vasws.php`](config/vasws.php). `package` must match the value stored in that
+service's `profiles.package` column, and `connection` must name a connection defined in
+`config/database.php`.
+
+### Adding a service
+
+1. Add an entry to `config/vasws.php` with its `package` and `connection`.
+2. Add a `'<connection>' => [...]` block to `config/database.php` and the matching
+   `DB_<NAME>_*` variables to `.env`.
+3. Run `php artisan migrate` to create the two tables on the new database.
+
+No application code changes; every endpoint is catalog-driven.

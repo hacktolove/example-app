@@ -11,8 +11,6 @@ class DisplayServicesTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $connectionsToTransact = ['sqlite', 'profiles'];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -27,7 +25,7 @@ class DisplayServicesTest extends TestCase
 
     public function test_returns_active_service_for_subscribed_mdn(): void
     {
-        Profile::create([
+        Profile::on('sport')->create([
             'msisdn' => '+249999900046',
             'package' => 'sport',
             'status' => 1,
@@ -40,6 +38,7 @@ class DisplayServicesTest extends TestCase
 
         $response->assertOk();
         $response->assertJson(['success' => true, 'msg' => 'successful operation', 'result' => 0]);
+        $response->assertJsonCount(1, 'data');
         $response->assertJsonFragment([
             'id' => 2,
             'englishname' => 'Sport',
@@ -47,6 +46,55 @@ class DisplayServicesTest extends TestCase
             'subscription_date' => '2023-12-01 15:55:00',
             'subscription_channel' => 'vasws',
         ]);
+    }
+
+    public function test_returns_every_service_the_subscriber_is_active_in(): void
+    {
+        Profile::on('news')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'news',
+            'status' => 1,
+            'channel' => 'ccs',
+            'subs_date' => '2024-01-10',
+            'subs_time' => '08:00:00',
+        ]);
+        Profile::on('sport')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'sport',
+            'status' => 1,
+            'channel' => 'vasws',
+            'subs_date' => '2024-02-20',
+            'subs_time' => '09:30:00',
+        ]);
+
+        $response = $this->authed('/vasws/displayservices?mdn=0999900046');
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonFragment(['id' => 1, 'englishname' => 'News', 'subscription_channel' => 'ccs']);
+        $response->assertJsonFragment(['id' => 2, 'englishname' => 'Sport', 'subscription_channel' => 'vasws']);
+    }
+
+    public function test_inactive_profile_in_one_service_is_excluded(): void
+    {
+        Profile::on('news')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'news',
+            'status' => 0,
+            'channel' => 'ccs',
+        ]);
+        Profile::on('sport')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'sport',
+            'status' => 1,
+            'channel' => 'vasws',
+        ]);
+
+        $response = $this->authed('/vasws/displayservices?mdn=0999900046');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonFragment(['id' => 2]);
     }
 
     public function test_returns_empty_data_for_unsubscribed_mdn(): void
