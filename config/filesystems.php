@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        'ivr' => [
+            'driver' => 'local',
+            // `?:` not a default argument: a bare `IVR_AUDIO_ROOT=` in .env yields an
+            // empty string, which env()'s default would not replace.
+            'root' => env('IVR_AUDIO_ROOT') ?: storage_path('app/ivr'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

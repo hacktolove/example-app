@@ -19,3 +19,11 @@ _Avoid_: Subscription (ambiguous with Profile's subscription status), event
 **MSISDN**:
 A subscriber's phone number in normalized international form (e.g. `+249999900046`). The natural key for Profile — no surrogate ID exists.
 _Avoid_: Number, phone, msisdn (lowercase in prose)
+
+**IVR prompt**:
+A piece of audio a caller hears, belonging to exactly one Service and holding a fixed place in that Service's playback sequence. Order is meaningful — prompts play first to last — so moving one changes what callers hear. Unlike Profiles, prompts are this application's own content, not telco-owned state.
+_Avoid_: Recording, greeting, announcement, message
+
+**Call flow**:
+The ordered sequence of IVR prompts for one Service, taken as a whole. Each Service has exactly one call flow, and call flows are independent of one another in the same way Services are.
+_Avoid_: Playlist, queue, script
