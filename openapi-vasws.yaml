@@ -5,10 +5,11 @@ info:
     VAS Web Service used by Selfcare and CCS to manage subscriber VAS
     registrations. All endpoints are `GET`, URL-based
     (`/vasws/{function}?param=value`), return UTF-8 JSON, and are protected by
-    HTTP Basic Authentication. A subscriber has at most one active service at a
-    time; every subscribe/unsubscribe cycle is retained and returned by the
-    history endpoint.
-  version: 1.5.0
+    HTTP Basic Authentication. Services are independent: a subscriber may hold
+    any combination of them at once, and subscribing to or leaving one never
+    affects another. Every subscribe/unsubscribe cycle is retained and returned
+    by the history endpoint.
+  version: 2.0.0
 servers:
   - url: "{baseUrl}"
     description: Base URL of the VAS Web Service (provided by the operator).
@@ -60,7 +61,9 @@ paths:
         - $ref: '#/components/parameters/Mdn'
       responses:
         '200':
-          description: The subscriber's currently active services (empty array if none)
+          description: >
+            Every service the subscriber is currently active in, in catalog
+            order (empty array if none).
           content:
             application/json:
               schema:
@@ -85,9 +88,14 @@ paths:
                 result: 0
                 data:
                   - id: 1
+                    englishname: News
+                    arabicname: الأخبار
+                    subscription_date: "2023-12-01 15:55:00"
+                    subscription_channel: ccs
+                  - id: 2
                     englishname: Sport
                     arabicname: الرياضة
-                    subscription_date: "2023-12-01 15:55:00"
+                    subscription_date: "2024-02-20 09:30:00"
                     subscription_channel: vasws
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -169,8 +177,9 @@ paths:
       operationId: removeAll
       summary: Remove all of a subscriber's active services
       description: >
-        Deactivates the subscriber's active service (if any) and logs it to
-        history the same way as `remove`. Succeeds even when nothing is active.
+        Deactivates the subscriber in every service they are active in, logging
+        each to that service's history the same way as `remove`. Succeeds even
+        when nothing is active.
       parameters:
         - $ref: '#/components/parameters/Mdn'
       responses:

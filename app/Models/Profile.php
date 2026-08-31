@@ -5,12 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 #[Fillable(['msisdn', 'package', 'language', 'channel', 'status', 'subs_date', 'subs_time', 'last_update_date', 'last_update_time', 'last_charge_date', 'last_charge_time'])]
 class Profile extends Model
 {
-    protected $connection = 'profiles';
-
     protected $table = 'profiles';
 
     protected $primaryKey = 'msisdn';
@@ -20,6 +19,20 @@ class Profile extends Model
     protected $keyType = 'string';
 
     public $timestamps = false;
+
+    /**
+     * Each VAS service owns its own database, so a Profile is meaningless
+     * without one. Resolve it through App\Support\ServiceStore rather than
+     * querying this model directly.
+     */
+    public function getConnectionName(): string
+    {
+        if ($this->connection === null) {
+            throw new RuntimeException('Profile has no service connection; resolve it through ServiceStore.');
+        }
+
+        return $this->connection;
+    }
 
     protected function casts(): array
     {

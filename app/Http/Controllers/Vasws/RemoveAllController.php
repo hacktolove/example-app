@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Vasws;
 
 use App\Http\Controllers\Controller;
 use App\Models\Profile;
-use App\Models\VasSubscriptionHistory;
+use App\Support\ServiceStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +14,9 @@ class RemoveAllController extends Controller
 {
     /**
      * Handle the incoming request.
+     *
+     * Each service holds its own subscribers, so removing everything means
+     * unsubscribing from every service store the subscriber is active in.
      */
     public function __invoke(Request $request): JsonResponse
     {
@@ -30,23 +33,8 @@ class RemoveAllController extends Controller
         }
 
         try {
-            $profile = Profile::find($msisdn);
-
-            if ($profile && (int) $profile->status === 1) {
-                VasSubscriptionHistory::create([
-                    'mdn' => $msisdn,
-                    'package' => $profile->package,
-                    'subscribed_at' => $profile->subscribedAt() ?? now(),
-                    'subscribed_channel' => $profile->channel,
-                    'unsubscribed_at' => now(),
-                    'unsubscribed_channel' => 'vasws',
-                ]);
-
-                $profile->update([
-                    'status' => 0,
-                    'last_update_date' => now()->toDateString(),
-                    'last_update_time' => now()->toTimeString(),
-                ]);
+            foreach (ServiceStore::all() as $service) {
+                $service->unsubscribe($msisdn, 'vasws');
             }
         } catch (Throwable $e) {
             Log::error('vasws removeall failed', ['mdn' => $msisdn, 'exception' => $e]);

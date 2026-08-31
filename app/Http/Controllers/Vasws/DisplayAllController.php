@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Vasws;
 
 use App\Http\Controllers\Controller;
-use App\Support\VasServiceCatalog;
+use App\Support\ServiceStore;
 use Illuminate\Http\JsonResponse;
 
 class DisplayAllController extends Controller
@@ -13,10 +13,10 @@ class DisplayAllController extends Controller
      */
     public function __invoke(): JsonResponse
     {
-        $data = collect(VasServiceCatalog::all())->map(fn (array $service) => [
-            'id' => $service['id'],
-            'englishname' => $service['english_name'],
-            'arabicname' => $service['arabic_name'],
+        $data = collect(ServiceStore::all())->values()->map(fn (ServiceStore $service) => [
+            'id' => $service->id,
+            'englishname' => $service->englishName,
+            'arabicname' => $service->arabicName,
         ]);
 
         return response()->json([

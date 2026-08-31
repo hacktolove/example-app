@@ -12,8 +12,6 @@ class RemoveAllTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $connectionsToTransact = ['sqlite', 'profiles'];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -28,7 +26,7 @@ class RemoveAllTest extends TestCase
 
     public function test_removes_active_subscription_and_logs_history(): void
     {
-        Profile::create([
+        Profile::on('news')->create([
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
@@ -42,8 +40,31 @@ class RemoveAllTest extends TestCase
         $response->assertOk();
         $response->assertJson(['result' => 0, 'msg' => 'services have been removed successfully', 'success' => true]);
 
-        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'profiles');
-        $this->assertDatabaseHas('vas_subscription_history', ['mdn' => '+249999900046', 'package' => 'news'], 'profiles');
+        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'news');
+        $this->assertDatabaseHas('vas_subscription_history', ['mdn' => '+249999900046', 'package' => 'news'], 'news');
+    }
+
+    public function test_removes_the_subscriber_from_every_service(): void
+    {
+        Profile::on('news')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'news',
+            'status' => 1,
+            'channel' => 'ccs',
+        ]);
+        Profile::on('sport')->create([
+            'msisdn' => '+249999900046',
+            'package' => 'sport',
+            'status' => 1,
+            'channel' => 'vasws',
+        ]);
+
+        $this->authed('/vasws/removeall?mdn=0999900046')->assertOk();
+
+        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'news');
+        $this->assertDatabaseHas('profiles', ['msisdn' => '+249999900046', 'status' => 0], 'sport');
+        $this->assertDatabaseCount('vas_subscription_history', 1, 'news');
+        $this->assertDatabaseCount('vas_subscription_history', 1, 'sport');
     }
 
     public function test_succeeds_when_no_active_subscription(): void
@@ -53,7 +74,8 @@ class RemoveAllTest extends TestCase
         $response->assertOk();
         $response->assertJson(['result' => 0, 'success' => true]);
 
-        $this->assertSame(0, VasSubscriptionHistory::on('profiles')->count());
+        $this->assertSame(0, VasSubscriptionHistory::on('news')->count());
+        $this->assertSame(0, VasSubscriptionHistory::on('sport')->count());
     }
 
     public function test_missing_mdn_returns_400(): void
