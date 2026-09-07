@@ -1,7 +1,24 @@
-import { ArrowDown, ArrowUp, GripVertical, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import {
+    ArrowDown,
+    ArrowUp,
+    GripVertical,
+    Pause,
+    Play,
+    Trash2,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { audio as audioRoute } from '@/routes/ivr';
 
 export interface IvrPrompt {
     id: number;
@@ -47,6 +64,29 @@ export default function PromptSequence({
     disabled: boolean;
 }) {
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+    const [playingId, setPlayingId] = useState<number | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const togglePlay = (prompt: IvrPrompt) => {
+        const player = (audioRef.current ??= new Audio());
+
+        if (playingId === prompt.id) {
+            player.pause();
+            setPlayingId(null);
+
+            return;
+        }
+
+        player.pause();
+        player.src = audioRoute.url(prompt.id);
+        player.onended = () => setPlayingId(null);
+        player.play();
+        setPlayingId(prompt.id);
+    };
+
+    // Stop playback rather than leaving it running against an unmounted page,
+    // e.g. after switching services.
+    useEffect(() => () => audioRef.current?.pause(), []);
 
     const move = (from: number, to: number) => {
         if (to < 0 || to >= prompts.length || from === to) {
@@ -125,6 +165,30 @@ export default function PromptSequence({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
+                                aria-label={
+                                    playingId === prompt.id
+                                        ? `Pause ${prompt.originalName}`
+                                        : `Play ${prompt.originalName}`
+                                }
+                                onClick={() => togglePlay(prompt)}
+                            >
+                                {playingId === prompt.id ? (
+                                    <Pause
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
+                                ) : (
+                                    <Play
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
+                                )}
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
                                 disabled={disabled || index === 0}
                                 aria-label={`Move ${prompt.originalName} earlier`}
                                 onClick={() => move(index, index - 1)}
@@ -151,16 +215,49 @@ export default function PromptSequence({
                                 />
                             </Button>
 
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                disabled={disabled}
-                                aria-label={`Remove ${prompt.originalName}`}
-                                onClick={() => onDelete(prompt)}
-                            >
-                                <Trash2 className="size-4" aria-hidden="true" />
-                            </Button>
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={disabled}
+                                        aria-label={`Remove ${prompt.originalName}`}
+                                    >
+                                        <Trash2
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogTitle>
+                                        Remove {prompt.originalName}?
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        This deletes the file from the call
+                                        flow and renumbers the prompts after
+                                        it. This cannot be undone.
+                                    </DialogDescription>
+                                    <DialogFooter>
+                                        <DialogClose asChild>
+                                            <Button variant="secondary">
+                                                Cancel
+                                            </Button>
+                                        </DialogClose>
+                                        <DialogClose asChild>
+                                            <Button
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    onDelete(prompt)
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
+                                        </DialogClose>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </li>
                 );
