@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IvrController extends Controller
 {
@@ -81,6 +82,20 @@ class IvrController extends Controller
         IvrLibrary::for($service)->reorder($validated['order']);
 
         return back()->with('status', 'Order updated.');
+    }
+
+    /**
+     * Stream a prompt's audio for in-dashboard playback.
+     */
+    public function audio(IvrAudioFile $ivrAudioFile): StreamedResponse
+    {
+        $service = ServiceStore::find($ivrAudioFile->service_id);
+
+        if (! $service) {
+            abort(404);
+        }
+
+        return IvrLibrary::for($service)->stream($ivrAudioFile);
     }
 
     /**

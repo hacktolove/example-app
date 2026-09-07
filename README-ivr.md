@@ -35,9 +35,29 @@ IVR_AUDIO_ROOT=/srv/ivr/prompts
 Defaults to `storage/app/ivr` when unset. Directory layout and the disk itself are defined
 in `config/ivr.php` and `config/filesystems.php`.
 
-**Permissions:** the web user needs write access to this path and the telephony user needs
-read access. If the path is a shared mount, check both before go-live — a permission
-problem surfaces at upload time, not at deploy time.
+**Permissions.** The web user must be able to create and write inside this path; the
+telephony user must be able to read it. Service directories are created `0755` and files
+`0644` (set explicitly on the disk — Flysystem's default `0700` directory would deny the
+telephony user traversal, and that failure shows up as a silent prompt during a call
+rather than as an error at upload). Tighten to `0750`/`0640` via the `permissions` key in
+`config/filesystems.php` if the telephony user can be placed in a shared group.
+
+**Upload size.** The dashboard advertises 10 MB, so PHP and the web server must allow at
+least that or uploads fail before Laravel ever sees them — with no validation message,
+because the request never arrives:
+
+```ini
+; php.ini
+upload_max_filesize = 12M
+post_max_size = 12M
+```
+
+```nginx
+# nginx defaults to 1M
+client_max_body_size 12M;
+```
+
+Keep these above `max_upload_kilobytes` in `config/ivr.php`.
 
 ## Accepted audio
 

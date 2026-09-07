@@ -52,6 +52,16 @@ return [
             // `?:` not a default argument: a bare `IVR_AUDIO_ROOT=` in .env yields an
             // empty string, which env()'s default would not replace.
             'root' => env('IVR_AUDIO_ROOT') ?: storage_path('app/ivr'),
+            // The telephony system reads these files as a different user, so the
+            // service directories must be traversable by it. Flysystem's default of
+            // 0700 would deny that, and the failure appears as a silent prompt during
+            // a call rather than as an error here. Tighten to 0750/0640 with a shared
+            // group if the telephony user can be put in one.
+            'visibility' => 'public',
+            'permissions' => [
+                'file' => ['public' => 0644, 'private' => 0600],
+                'dir' => ['public' => 0755, 'private' => 0700],
+            ],
             'serve' => false,
             'throw' => false,
             'report' => false,

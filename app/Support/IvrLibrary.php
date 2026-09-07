@@ -3,12 +3,13 @@
 namespace App\Support;
 
 use App\Models\IvrAudioFile;
-use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The ordered set of IVR prompts for one service, and the files on disk that
@@ -76,6 +77,17 @@ final class IvrLibrary
                 'uploaded_by' => $uploadedBy,
             ]);
         });
+    }
+
+    /**
+     * Stream a prompt's audio so the dashboard can play it back.
+     */
+    public function stream(IvrAudioFile $file): StreamedResponse
+    {
+        return $this->disk()->response(
+            $this->directory().'/'.$file->filename,
+            $file->original_name,
+        );
     }
 
     /**
@@ -173,7 +185,7 @@ final class IvrLibrary
         return sprintf('%03d-%s.wav', $position, Str::limit($stem, 60, ''));
     }
 
-    private function disk(): Filesystem
+    private function disk(): FilesystemAdapter
     {
         return Storage::disk(config('ivr.disk'));
     }

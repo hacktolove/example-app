@@ -23,6 +23,27 @@ class ServiceIsolationTest extends TestCase
         $this->assertSame(['news', 'sport'], ServiceStore::connections());
     }
 
+    public function test_an_incomplete_catalog_entry_names_what_is_missing(): void
+    {
+        config(['vasws.services' => [
+            1 => ['package' => 'news', 'english_name' => 'News', 'arabic_name' => 'X'],
+        ]]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('VAS service [1] in config/vasws.php is missing: connection');
+
+        ServiceStore::all();
+    }
+
+    public function test_an_incomplete_catalog_entry_points_at_the_config_cache(): void
+    {
+        config(['vasws.services' => [2 => ['package' => 'sport']]]);
+
+        $this->expectExceptionMessage('php artisan config:clear');
+
+        ServiceStore::all();
+    }
+
     public function test_unknown_serviceid_resolves_to_null(): void
     {
         $this->assertNull(ServiceStore::find(999));

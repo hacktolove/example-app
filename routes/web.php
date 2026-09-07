@@ -15,6 +15,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('ivr', [IvrController::class, 'index'])->name('ivr.index');
     Route::post('ivr', [IvrController::class, 'store'])->name('ivr.store');
     Route::put('ivr/order', [IvrController::class, 'reorder'])->name('ivr.reorder');
+    Route::get('ivr/{ivrAudioFile}/audio', [IvrController::class, 'audio'])->name('ivr.audio');
     Route::delete('ivr/{ivrAudioFile}', [IvrController::class, 'destroy'])->name('ivr.destroy');
 });
 
