@@ -41,7 +41,7 @@ class SubscribeController extends Controller
         }
 
         try {
-            $inserted = $service->subscribe($msisdn, 'api');
+            $inserted = $service->subscribe($msisdn, 'Online Ads');
             $action = $inserted ? 'insert' : 'update';
 
             return response()->json([

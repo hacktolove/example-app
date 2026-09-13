@@ -40,7 +40,7 @@ class RemoveController extends Controller
         }
 
         try {
-            if (! $service->unsubscribe($msisdn, 'vasws')) {
+            if (! $service->unsubscribe($msisdn, 'CCS')) {
                 return response()->json(['result' => 2, 'msg' => 'subscriber is not registered in this service', 'success' => false]);
             }
         } catch (Throwable $e) {

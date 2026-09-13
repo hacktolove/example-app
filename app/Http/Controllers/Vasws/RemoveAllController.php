@@ -34,7 +34,7 @@ class RemoveAllController extends Controller
 
         try {
             foreach (ServiceStore::all() as $service) {
-                $service->unsubscribe($msisdn, 'vasws');
+                $service->unsubscribe($msisdn, 'CCS');
             }
         } catch (Throwable $e) {
             Log::error('vasws removeall failed', ['mdn' => $msisdn, 'exception' => $e]);
