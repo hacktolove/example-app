@@ -92,6 +92,13 @@ Migrations skip a table that already exists, so pointing at a telco-provisioned 
 is safe. `mdn` and `package` are indexed on `vas_subscription_history`, and `profiles` is
 keyed by `msisdn`, to keep lookups under Selfcare's 5-second client timeout.
 
+**`migrate` only helps on a fresh environment.** The migrator runs a given migration file
+once, ever — if `news`/`sport` already existed when these migrations first ran, a
+connection added later gets nothing from `migrate`, and instead fails at request time with
+`relation "profiles" does not exist`. Run `php artisan vasws:ensure-tables` after adding a
+connection (or any time, as a safe check) — it applies the same per-connection, idempotent
+table creation without going through the migration ledger.
+
 Application code never names a connection directly — `App\Support\ServiceStore` resolves
 a `serviceid` to its store, and is the only place that knows connections exist.
 
@@ -130,9 +137,12 @@ service's `profiles.package` column, and `connection` must name a connection def
 1. Add an entry to `config/vasws.php` with its `package` and `connection`.
 2. Add a `'<connection>' => [...]` block to `config/database.php` and the matching
    `DB_<NAME>_*` variables to `.env`.
-3. Run `php artisan migrate` to create the two tables on the new database.
-4. On any environment that caches config, run `php artisan config:clear` (or
-   `optimize:clear`) **before** migrating. The catalog is read from config, so a cache
-   built before the change makes `migrate` fail on the old entries.
+3. On any environment that caches config, run `php artisan config:clear` (or
+   `optimize:clear`) **before** the next step. The catalog is read from config, so a cache
+   built before the change makes it fail on the old entries.
+4. Run `php artisan vasws:ensure-tables` to create the two tables on the new database. Use
+   this, not `php artisan migrate` — the `profiles`/`vas_subscription_history` migrations
+   have already run in every existing environment, so the migrator skips them and creates
+   nothing for a connection added now.
 
 No application code changes; every endpoint is catalog-driven.
