@@ -31,7 +31,7 @@ final class ServiceSchema
             $table->string('msisdn', 16)->primary();
             $table->string('package', 8)->nullable();
             $table->string('language', 8)->nullable();
-            $table->string('channel', 8)->nullable();
+            $table->string('channel', 20)->nullable();
             $table->smallInteger('status')->nullable();
             $table->date('subs_date')->nullable();
             $table->time('subs_time')->nullable();
@@ -58,9 +58,9 @@ final class ServiceSchema
             $table->string('mdn', 16);
             $table->string('package', 8);
             $table->dateTime('subscribed_at');
-            $table->string('subscribed_channel', 8)->nullable();
+            $table->string('subscribed_channel', 20)->nullable();
             $table->dateTime('unsubscribed_at');
-            $table->string('unsubscribed_channel', 8)->nullable();
+            $table->string('unsubscribed_channel', 20)->nullable();
 
             $table->index('mdn');
             $table->index('package');

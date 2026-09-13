@@ -39,7 +39,7 @@ class SubscribeTest extends TestCase
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
-            'channel' => 'api',
+            'channel' => 'Online Ads',
         ], 'news');
     }
 

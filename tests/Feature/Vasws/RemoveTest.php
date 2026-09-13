@@ -44,7 +44,7 @@ class RemoveTest extends TestCase
             'mdn' => '+249999900046',
             'package' => 'sport',
             'subscribed_channel' => 'vasws',
-            'unsubscribed_channel' => 'vasws',
+            'unsubscribed_channel' => 'CCS',
         ], 'sport');
     }
 

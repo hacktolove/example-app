@@ -34,7 +34,7 @@ class SubscribeTest extends TestCase
             'msisdn' => '+249999900046',
             'package' => 'news',
             'status' => 1,
-            'channel' => 'vasws',
+            'channel' => 'API',
         ], 'news');
     }
 
@@ -111,7 +111,7 @@ class SubscribeTest extends TestCase
 
         $news = Profile::on('news')->find('+249999900046');
         $this->assertSame(1, $news->status);
-        $this->assertSame('vasws', $news->channel);
+        $this->assertSame('API', $news->channel);
         $this->assertSame(now()->toDateString(), $news->subs_date->toDateString());
     }
 

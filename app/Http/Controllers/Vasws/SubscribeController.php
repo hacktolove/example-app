@@ -47,7 +47,7 @@ class SubscribeController extends Controller
                 return response()->json(['result' => 1, 'msg' => 'already subscribed', 'success' => false]);
             }
 
-            $service->subscribe($msisdn, 'vasws');
+            $service->subscribe($msisdn, 'API');
         } catch (Throwable $e) {
             Log::error('vasws subscribe failed', ['mdn' => $msisdn, 'serviceid' => $serviceId, 'exception' => $e]);
 
